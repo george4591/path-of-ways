@@ -1,0 +1,6 @@
+[serve]
+port = 8080
+open = true
+
+[tools]
+tailwindcss = "4.1.7"

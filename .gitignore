@@ -1,0 +1,37 @@
+# Rust build artifacts
+/target/
+**/target/
+**/*.rs.bk
+
+# Trunk (wasm build output)
+/dist/
+
+# Tauri generated schemas
+/src-tauri/gen/schemas/
+
+# Generated icon source PNG (regenerable from source.svg via resvg)
+# (Keep src-tauri/icons/source.svg, generated platform icons, and source.png
+#  — only ignore intermediate renders here.)
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node modules (if any tooling pulls them later)
+node_modules/
+
+# Claude Code local settings (per-machine, contains tool allowlists)
+/.claude/settings.local.json
+
+# Env files / secrets
+.env
+.env.local
+.env.*.local

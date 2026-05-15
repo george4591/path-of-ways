@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c1c24"/>
+      <stop offset="100%" stop-color="#0c0c12"/>
+    </linearGradient>
+    <linearGradient id="pathGrad" gradientUnits="userSpaceOnUse" x1="512" y1="870" x2="512" y2="230">
+      <stop offset="0%" stop-color="#b8853e"/>
+      <stop offset="100%" stop-color="#f0c97e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="180" ry="180" fill="url(#bg)"/>
+
+  <!-- Subtle inner border -->
+  <rect x="22" y="22" width="980" height="980" rx="160" ry="160"
+        fill="none" stroke="#2a2a35" stroke-width="3" opacity="0.7"/>
+
+  <!-- Three diverging paths from origin node, fanning upward -->
+  <g stroke="url(#pathGrad)" stroke-width="54" stroke-linecap="round" fill="none">
+    <!-- Center path: straight line up -->
+    <path d="M 512 870 L 512 230"/>
+    <!-- Left path: starts vertical then arcs out -->
+    <path d="M 512 870 C 512 700 380 500 230 280"/>
+    <!-- Right path: starts vertical then arcs out -->
+    <path d="M 512 870 C 512 700 644 500 794 280"/>
+  </g>
+
+  <!-- Origin node (the "you are here") -->
+  <circle cx="512" cy="870" r="68" fill="#f0c97e" stroke="#0c0c12" stroke-width="8"/>
+
+  <!-- Endpoint destination nodes -->
+  <circle cx="512" cy="230" r="56" fill="#f0c97e" stroke="#0c0c12" stroke-width="8"/>
+  <circle cx="230" cy="280" r="56" fill="#f0c97e" stroke="#0c0c12" stroke-width="8"/>
+  <circle cx="794" cy="280" r="56" fill="#f0c97e" stroke="#0c0c12" stroke-width="8"/>
+</svg>
