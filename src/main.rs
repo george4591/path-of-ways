@@ -1,5 +1,4 @@
 mod app_state;
-mod bosses;
 mod buttons;
 mod campaign;
 mod db;
@@ -18,7 +17,6 @@ mod theme;
 mod titlebar;
 
 use app_state::{provide_app_state, use_app_state, Page};
-use bosses::Bosses;
 use campaign::CampaignTracker;
 use error_log::{install_log_state, ErrorBanner};
 use help::HelpModal;
@@ -56,7 +54,6 @@ fn App() -> impl IntoView {
                     <Route path=path!("/") view=Notes/>
                     <Route path=path!("/notes") view=Notes/>
                     <Route path=path!("/campaign") view=CampaignTracker/>
-                    <Route path=path!("/bosses") view=Bosses/>
                     <Route path=path!("/recipes") view=Recipes/>
                     <Route path=path!("/links") view=Links/>
                 </Routes>
@@ -129,9 +126,8 @@ fn PageTabs() -> impl IntoView {
         <nav class="flex gap-2">
             <NavLink target=Page::Notes label="Notes" title="Notes (1)"/>
             <NavLink target=Page::Campaign label="Campaign" title="Campaign (2)"/>
-            <NavLink target=Page::Bosses label="Bosses" title="Bosses (3)"/>
-            <NavLink target=Page::Recipes label="Recipes" title="Recipes (4)"/>
-            <NavLink target=Page::Links label="Links" title="Links (5)"/>
+            <NavLink target=Page::Recipes label="Recipes" title="Recipes (3)"/>
+            <NavLink target=Page::Links label="Links" title="Links (4)"/>
         </nav>
     }
 }
