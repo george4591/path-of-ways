@@ -1,28 +1,15 @@
 //! Surfaces panics and uncaught JS errors as in-app toasts.
-//!
-//! In a Tauri release build the devtools inspector is reachable (`Ctrl+Shift+I`),
-//! but for everyday use we want errors to be visible *without* opening a debugger.
-//! This module:
-//!   1. Installs a panic hook that funnels every wasm panic into a shared signal
-//!      (and still forwards to `console.error` via `console_error_panic_hook`).
-//!   2. Attaches `window.onerror` / `window.onunhandledrejection` listeners that
-//!      forward uncaught JS-side errors into the same signal.
-//!   3. Provides an `<ErrorBanner/>` component that renders pending entries as
-//!      a stack of dismissable toasts pinned to the bottom-right.
-//!
-//! The signal lives in a `RwSignal` stored in a `OnceCell` so the panic hook
-//! (a `'static` closure with no Leptos context) can still push to it.
 
 use std::cell::RefCell;
 use std::panic::PanicHookInfo;
 use std::sync::OnceLock;
 
+use leptos::ev;
 use leptos::prelude::*;
 use leptos::web_sys;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ErrorEntry {
     pub id: u64,
     pub kind: &'static str,
@@ -102,26 +89,19 @@ fn panic_message(info: &PanicHookInfo) -> String {
 }
 
 fn install_window_listeners() {
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-
-    // window.onerror — runtime errors from any script
-    let on_error = Closure::<dyn FnMut(web_sys::Event)>::new(|ev: web_sys::Event| {
-        // ErrorEvent has a `.message` getter; fall back to event type if missing.
+    // 1. window.onerror — runtime script errors
+    window_event_listener(ev::error, |ev| {
         let msg = ev
-            .dyn_ref::<web_sys::ErrorEvent>()
+            .dyn_ref::<leptos::web_sys::ErrorEvent>()
             .map(|e| e.message())
             .unwrap_or_else(|| ev.type_());
         push_entry("error", msg);
     });
-    let _ = window.add_event_listener_with_callback("error", on_error.as_ref().unchecked_ref());
-    on_error.forget();
 
-    // window.onunhandledrejection — rejected promises with no catch
-    let on_rej = Closure::<dyn FnMut(web_sys::Event)>::new(|ev: web_sys::Event| {
+    // 2. window.onunhandledrejection — async promise unhandled crashes
+    window_event_listener(ev::unhandledrejection, |ev| {
         let msg = ev
-            .dyn_ref::<web_sys::PromiseRejectionEvent>()
+            .dyn_ref::<leptos::web_sys::PromiseRejectionEvent>()
             .map(|e| {
                 e.reason()
                     .as_string()
@@ -130,9 +110,6 @@ fn install_window_listeners() {
             .unwrap_or_else(|| "unhandled rejection".to_string());
         push_entry("rejection", msg);
     });
-    let _ = window
-        .add_event_listener_with_callback("unhandledrejection", on_rej.as_ref().unchecked_ref());
-    on_rej.forget();
 }
 
 /// Initialize the shared signal. Must be called inside a Leptos reactive owner

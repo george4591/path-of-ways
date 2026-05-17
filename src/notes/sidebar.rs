@@ -26,13 +26,6 @@ pub fn Sidebar() -> impl IntoView {
     let (active_tags, set_active_tags) = signal(Vec::<String>::new());
     let (show_new_menu, set_show_new_menu) = signal(false);
 
-    // Esc closes the template dropdown when it's open.
-    use_escape_key(move || {
-        if show_new_menu.get_untracked() {
-            set_show_new_menu.set(false);
-        }
-    });
-
     let persist_note = move |note: Note| {
         spawn_local(async move {
             save_one(note).await;

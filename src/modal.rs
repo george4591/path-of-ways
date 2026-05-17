@@ -15,20 +15,17 @@ use crate::keyboard::{use_enter_key, use_escape_key};
 pub fn ModalShell<C, K>(
     cancel: C,
     confirm: K,
-    #[prop(optional, into)] panel_class: String,
+    #[prop(optional, into)] panel_class: Option<&'static str>,
     children: Children,
 ) -> impl IntoView
 where
     C: Fn() + Copy + Send + Sync + 'static,
     K: Fn() + Copy + Send + Sync + 'static,
 {
-    use_escape_key(cancel);
-    use_enter_key(confirm);
+    use_escape_key(move || cancel());
+    use_enter_key(move || confirm());
 
-    let panel = format!(
-        "rounded-xl border border-border bg-bg-elevated p-6 w-full mx-4 shadow-2xl {}",
-        if panel_class.is_empty() { "max-w-sm" } else { panel_class.as_str() }
-    );
+    let custom_panel_class = panel_class.unwrap_or_else(|| "max-w-sm".into());
 
     view! {
         <div
@@ -36,7 +33,9 @@ where
             on:click=move |_| cancel()
         >
             <div
-                class=panel
+                class=format!(
+                    "rounded-xl border border-border bg-bg-elevated p-6 w-full mx-4 shadow-2xl {custom_panel_class}"
+                )
                 on:click=|ev: web_sys::MouseEvent| ev.stop_propagation()
             >
                 {children()}

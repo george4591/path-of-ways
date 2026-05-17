@@ -82,8 +82,12 @@ fn App() -> impl IntoView {
         let reader_clone = reader.clone();
         let set_pending_import = app.set_pending_import;
         let onload = Closure::wrap(Box::new(move |_: web_sys::Event| {
-            let Ok(result) = reader_clone.result() else { return };
-            let Some(text) = result.as_string() else { return };
+            let Ok(result) = reader_clone.result() else {
+                return;
+            };
+            let Some(text) = result.as_string() else {
+                return;
+            };
             match import_json(&text) {
                 Ok(list) => set_pending_import.set(Some(list)),
                 Err(_) => {
@@ -188,6 +192,7 @@ fn RouteSync() -> impl IntoView {
     Effect::new(move |_| {
         let path = location.pathname.get();
         let page = Page::from_route(&path);
+
         if app.page.get_untracked() != page {
             app.set_page.set(page);
         }
@@ -199,6 +204,7 @@ fn RouteSync() -> impl IntoView {
         let page = app.page.get();
         let target = page.route();
         let current = location.pathname.get_untracked();
+
         if current != target {
             navigate_owned(target, Default::default());
         }
@@ -206,4 +212,3 @@ fn RouteSync() -> impl IntoView {
 
     view! {}
 }
-

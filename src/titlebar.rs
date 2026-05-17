@@ -68,13 +68,14 @@ pub fn TitleBar() -> impl IntoView {
                 class="flex items-center px-3 gap-2 text-sm text-fg-muted font-medium"
                 data-tauri-drag-region
             >
-                <span data-tauri-drag-region>"Path of Ways"</span>
+
+                <span class="font-bold" data-tauri-drag-region>"Path of Ways"</span>
                 <span
                     class="text-xs text-fg-muted"
                     data-tauri-drag-region
                     title="App version"
                 >
-                        {format!("v{}", env!("CARGO_PKG_VERSION"))}
+                        {format!("[v{}]", env!("CARGO_PKG_VERSION"))}
                 </span>
             </div>
 
@@ -90,11 +91,6 @@ pub fn TitleBar() -> impl IntoView {
             {if in_tauri {
                 view! { <WindowControls /> }.into_any()
             } else {
-                // In browser dev there are no native window controls, but
-                // without anything taking up the right-hand chrome the
-                // flex-1 drag areas redistribute and the tabs drift right.
-                // Reserve the same width (3 × w-11 = 132px) so the layout
-                // is identical to the Tauri build.
                 view! { <div class="w-[132px]" data-tauri-drag-region></div> }.into_any()
             }}
         </div>
@@ -113,10 +109,6 @@ fn PageTabs() -> impl IntoView {
     }
 }
 
-/// One tab in the title bar's nav. Styled to match the File/View menu buttons
-/// so the whole title bar reads as one coherent chrome strip. Active tab is
-/// pinned-highlighted (same look as an opened menu) so the current page is
-/// obvious without breaking the visual rhythm.
 #[component]
 fn NavLink(
     target: Page,
