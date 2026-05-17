@@ -5,14 +5,38 @@ use wasm_bindgen::JsValue;
 use crate::db::{open_db, CAMPAIGN_STORE, ZONES_STORE};
 
 use super::data::seed_zones;
-use super::model::{Zone, ZoneProgress};
+use super::model::{StoredProgress, StoredZone, Zone, ZoneProgress};
 
-const ZONES_SEEDED_KEY: &str = "zones_seeded_v1";
+/// Bump this when changing `seed_zones` in a way that should overwrite a
+/// user's existing zones/progress. The mismatch with the value in
+/// `localStorage` triggers a wipe-and-reseed on next load.
+///
+/// v1 → v2 — initial migration to checklist-item zones
+/// v2 → v3 — campaign rewritten to current PoE2 structure (4 acts +
+///           3 interludes, no Cruel difficulty)
+const ZONES_SEEDED_KEY: &str = "zones_seeded_v3";
 
 // ─── Zone metadata ───────────────────────────────────────────────────────
 
 pub async fn load_zones() -> Vec<Zone> {
     if !has_seeded() {
+        // The seed key was bumped (or this is a fresh install) — wipe the
+        // existing zone + progress stores so the new defaults don't merge
+        // with stale data from a previous game version. If a clear fails,
+        // log it and bail out *without* marking seeded, so we'll retry next
+        // load instead of leaving the user with a mixed bag.
+        if let Err(err) = clear_store(ZONES_STORE).await {
+            web_sys::console::error_1(
+                &format!("campaign: failed to clear zones store: {err}").into(),
+            );
+            return load_zones_from_idb().await.unwrap_or_default();
+        }
+        if let Err(err) = clear_store(CAMPAIGN_STORE).await {
+            web_sys::console::error_1(
+                &format!("campaign: failed to clear progress store: {err}").into(),
+            );
+            return load_zones_from_idb().await.unwrap_or_default();
+        }
         let seed = seed_zones();
         for zone in &seed {
             let _ = save_zone_inner(zone).await;
@@ -21,6 +45,17 @@ pub async fn load_zones() -> Vec<Zone> {
         return seed;
     }
     load_zones_from_idb().await.unwrap_or_default()
+}
+
+async fn clear_store(store_name: &str) -> Result<(), String> {
+    let rexie = open_db().await?;
+    let txn = rexie
+        .transaction(&[store_name], TransactionMode::ReadWrite)
+        .map_err(|err| err.to_string())?;
+    let store = txn.store(store_name).map_err(|err| err.to_string())?;
+    store.clear().await.map_err(|err| err.to_string())?;
+    txn.done().await.map_err(|err| err.to_string())?;
+    Ok(())
 }
 
 async fn load_zones_from_idb() -> Result<Vec<Zone>, String> {
@@ -35,7 +70,11 @@ async fn load_zones_from_idb() -> Result<Vec<Zone>, String> {
         .map_err(|err| err.to_string())?;
     let zones = pairs
         .into_iter()
-        .filter_map(|(_, value)| serde_wasm_bindgen::from_value::<Zone>(value).ok())
+        .filter_map(|(_, value)| {
+            serde_wasm_bindgen::from_value::<StoredZone>(value)
+                .ok()
+                .map(StoredZone::into_zone)
+        })
         .collect();
     txn.done().await.map_err(|err| err.to_string())?;
     Ok(zones)
@@ -93,7 +132,11 @@ async fn load_progress_inner() -> Result<Vec<ZoneProgress>, String> {
         .map_err(|err| err.to_string())?;
     let progress = pairs
         .into_iter()
-        .filter_map(|(_, value)| serde_wasm_bindgen::from_value::<ZoneProgress>(value).ok())
+        .filter_map(|(_, value)| {
+            serde_wasm_bindgen::from_value::<StoredProgress>(value)
+                .ok()
+                .map(StoredProgress::into_progress)
+        })
         .collect();
     txn.done().await.map_err(|err| err.to_string())?;
     Ok(progress)
@@ -101,6 +144,13 @@ async fn load_progress_inner() -> Result<Vec<ZoneProgress>, String> {
 
 pub async fn save_zone_progress(progress: ZoneProgress) {
     let _ = save_progress_inner(&progress).await;
+}
+
+/// Wipe every ZoneProgress record. Used by the "Reset progress" action — does
+/// not touch the Zone records themselves so user-authored zones, checklist
+/// items, and tags survive.
+pub async fn clear_all_progress() {
+    let _ = clear_store(CAMPAIGN_STORE).await;
 }
 
 async fn save_progress_inner(progress: &ZoneProgress) -> Result<(), String> {

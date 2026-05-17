@@ -28,8 +28,10 @@ desktop.ini
 # Node modules (if any tooling pulls them later)
 node_modules/
 
-# Claude Code local settings (per-machine, contains tool allowlists)
-/.claude/settings.local.json
+# Claude Code per-machine state — settings.local.json, scheduled task locks,
+# anything else that shouldn't be shared between checkouts.
+/.claude/*
+!/.claude/settings.json
 
 # Env files / secrets
 .env
