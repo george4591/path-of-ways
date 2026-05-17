@@ -11,7 +11,7 @@ where
     K: Fn() + Copy + Send + Sync + 'static,
 {
     view! {
-        <ModalShell cancel=cancel>
+        <ModalShell cancel=cancel confirm=confirm>
             <h3 class="text-lg font-semibold text-fg mb-2">"Delete this note?"</h3>
             <p class="text-sm text-fg-muted mb-4">"This can't be undone."</p>
             <div class="flex justify-end gap-2">
@@ -32,7 +32,7 @@ where
     K: Fn() + Copy + Send + Sync + 'static,
 {
     view! {
-        <ModalShell cancel=cancel>
+        <ModalShell cancel=cancel confirm=confirm>
             <h3 class="text-lg font-semibold text-fg mb-2">"Merge imported notes?"</h3>
             <p class="text-sm text-fg-muted mb-4">
                 {move || {

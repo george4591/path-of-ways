@@ -38,7 +38,7 @@ where
     C: Fn() + Copy + Send + Sync + 'static,
 {
     view! {
-        <ModalShell cancel=close panel_class="max-w-3xl max-h-[85vh] overflow-auto">
+        <ModalShell cancel=close confirm=close panel_class="max-w-3xl max-h-[85vh] overflow-auto">
             <div class="flex items-center justify-between mb-4">
                     <h3 class="text-xl font-semibold text-fg m-0">"Formatting & shortcuts"</h3>
                     <button

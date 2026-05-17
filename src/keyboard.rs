@@ -34,6 +34,62 @@ where
     handler.forget();
 }
 
+/// Attach a document-level `keydown` listener that calls `confirm` when the
+/// user presses Enter — typically used by modal shells so Enter saves an edit.
+///
+/// Behavior:
+/// - Plain `Enter` inside a `<textarea>` is left alone (newline as expected).
+/// - `Ctrl+Enter` works *anywhere*, including textareas, so multi-line forms
+///   can still be saved without the mouse.
+/// - Plain `Enter` anywhere else (inputs, focused buttons, no focus) → confirm.
+/// - Combinations with `Alt`, `Shift`, or `Meta` are ignored to avoid clashing
+///   with the editor / OS shortcuts.
+///
+/// The listener is cleaned up when the calling reactive scope drops.
+pub fn use_enter_key<F>(confirm: F)
+where
+    F: Fn() + Copy + 'static,
+{
+    let Some(window) = web_sys::window() else { return };
+    let Some(document) = window.document() else { return };
+
+    let handler = Closure::wrap(Box::new(move |ev: web_sys::KeyboardEvent| {
+        if ev.key() != "Enter" {
+            return;
+        }
+        // Don't compete with editor shortcuts.
+        if ev.alt_key() || ev.shift_key() || ev.meta_key() {
+            return;
+        }
+        // Plain Enter inside a textarea must remain a newline — only Ctrl+Enter
+        // is a save shortcut there.
+        if active_is_textarea() && !ev.ctrl_key() {
+            return;
+        }
+        ev.prevent_default();
+        confirm();
+    }) as Box<dyn FnMut(_)>);
+
+    let handler_fn: js_sys::Function = handler.as_ref().unchecked_ref::<js_sys::Function>().clone();
+    let _ = document.add_event_listener_with_callback("keydown", &handler_fn);
+
+    let document_for_cleanup = document.clone();
+    let handler_for_cleanup = handler_fn.clone();
+    on_cleanup(move || {
+        let _ = document_for_cleanup
+            .remove_event_listener_with_callback("keydown", &handler_for_cleanup);
+    });
+
+    handler.forget();
+}
+
+fn active_is_textarea() -> bool {
+    let Some(window) = web_sys::window() else { return false };
+    let Some(doc) = window.document() else { return false };
+    let Some(active) = doc.active_element() else { return false };
+    active.tag_name().eq_ignore_ascii_case("TEXTAREA")
+}
+
 /// Attach a global keydown listener to the document for app-wide shortcuts.
 /// The listener is leaked intentionally — App is the root component and
 /// never unmounts, so cleanup isn't needed.
