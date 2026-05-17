@@ -74,7 +74,7 @@ where
                         <Kbd label="4"/>
                         <Kbd label="5"/>
                     </div>
-                    <div class="text-fg-muted">"Switch tabs: Notes · Campaign · Bosses · Recipes · Links (when not typing in a field)"</div>
+                    <div class="text-fg-muted">"Switch tabs: Notes · Campaign · Recipes · Links (when not typing in a field)"</div>
 
                     <div class="flex flex-wrap gap-1">
                         <Kbd label="Ctrl"/>

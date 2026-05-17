@@ -4,7 +4,6 @@ use leptos::web_sys;
 pub enum Page {
     Notes,
     Campaign,
-    Bosses,
     Recipes,
     Links,
 }
@@ -14,7 +13,6 @@ impl Page {
         match self {
             Page::Notes => "notes",
             Page::Campaign => "campaign",
-            Page::Bosses => "bosses",
             Page::Recipes => "recipes",
             Page::Links => "links",
         }
@@ -25,18 +23,18 @@ impl Page {
         match self {
             Page::Notes => "/notes",
             Page::Campaign => "/campaign",
-            Page::Bosses => "/bosses",
             Page::Recipes => "/recipes",
             Page::Links => "/links",
         }
     }
 
     /// Map a URL path to a Page. `/` and unknown paths fall back to Notes.
+    /// Legacy `/bosses` routes (from before the Bosses tab was removed)
+    /// also redirect to Notes for graceful handling of old bookmarks.
     pub fn from_route(pathname: &str) -> Self {
         let trimmed = pathname.trim_start_matches('/');
         match trimmed {
             "campaign" => Page::Campaign,
-            "bosses" => Page::Bosses,
             "recipes" => Page::Recipes,
             "links" => Page::Links,
             _ => Page::Notes,
@@ -47,7 +45,6 @@ impl Page {
         Some(match value {
             "notes" => Page::Notes,
             "campaign" => Page::Campaign,
-            "bosses" => Page::Bosses,
             "recipes" => Page::Recipes,
             "links" => Page::Links,
             _ => return None,

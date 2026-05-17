@@ -220,9 +220,8 @@ fn ViewMenu() -> impl IntoView {
         <MenuButton label="View">
             <MenuItem label="Notes"    shortcut="1" on_select=move || app.set_page.set(Page::Notes)/>
             <MenuItem label="Campaign" shortcut="2" on_select=move || app.set_page.set(Page::Campaign)/>
-            <MenuItem label="Bosses"   shortcut="3" on_select=move || app.set_page.set(Page::Bosses)/>
-            <MenuItem label="Recipes"  shortcut="4" on_select=move || app.set_page.set(Page::Recipes)/>
-            <MenuItem label="Links"    shortcut="5" on_select=move || app.set_page.set(Page::Links)/>
+            <MenuItem label="Recipes"  shortcut="3" on_select=move || app.set_page.set(Page::Recipes)/>
+            <MenuItem label="Links"    shortcut="4" on_select=move || app.set_page.set(Page::Links)/>
             <MenuSeparator/>
             <MenuItem
                 label="Cycle Theme"

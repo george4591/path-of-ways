@@ -134,13 +134,9 @@ pub fn install_global_shortcuts(state: AppState) {
             }
             "3" => {
                 ev.prevent_default();
-                state.set_page.set(Page::Bosses);
-            }
-            "4" => {
-                ev.prevent_default();
                 state.set_page.set(Page::Recipes);
             }
-            "5" => {
+            "4" => {
                 ev.prevent_default();
                 state.set_page.set(Page::Links);
             }

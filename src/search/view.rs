@@ -3,7 +3,6 @@ use leptos::task::spawn_local;
 use leptos::web_sys;
 
 use crate::app_state::{open_note, open_note_for_zone, use_app_state, Page};
-use crate::bosses::{load_bosses, Boss};
 use crate::campaign::{load_zones, Zone};
 use crate::keyboard::use_escape_key;
 use crate::notes::{render_inline_md, Template};
@@ -20,7 +19,6 @@ pub fn QuickSwitcher() -> impl IntoView {
     let (links, set_links) = signal(Vec::<LinkRow>::new());
     let (recipes, set_recipes) = signal(Vec::<Recipe>::new());
     let (zones, set_zones) = signal(Vec::<Zone>::new());
-    let (bosses, set_bosses) = signal(Vec::<Boss>::new());
 
     spawn_local(async move {
         set_links.set(load_links().await);
@@ -30,9 +28,6 @@ pub fn QuickSwitcher() -> impl IntoView {
     });
     spawn_local(async move {
         set_zones.set(load_zones().await);
-    });
-    spawn_local(async move {
-        set_bosses.set(load_bosses().await);
     });
 
     let input_ref = NodeRef::<leptos::html::Input>::new();
@@ -53,7 +48,6 @@ pub fn QuickSwitcher() -> impl IntoView {
         compute_groups(
             app.notes.get(),
             zones.get(),
-            bosses.get(),
             recipes.get(),
             links.get(),
             &query.get(),
@@ -67,9 +61,6 @@ pub fn QuickSwitcher() -> impl IntoView {
                 zone_id, name, ..
             } => {
                 open_note_for_zone(app, zone_id, name, Template::Blank);
-            }
-            Result::Boss { .. } => {
-                app.set_page.set(Page::Bosses);
             }
             Result::Recipe { .. } => {
                 app.set_page.set(Page::Recipes);
@@ -92,7 +83,7 @@ pub fn QuickSwitcher() -> impl IntoView {
                     <input
                         node_ref=input_ref
                         type="text"
-                        placeholder="Search notes, zones, bosses, recipes, links…"
+                        placeholder="Search notes, zones, recipes, links…"
                         class="w-full rounded-md bg-bg border border-border px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
                         prop:value=move || query.get()
                         on:input=move |ev| set_query.set(event_target_value(&ev))

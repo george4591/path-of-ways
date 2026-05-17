@@ -1,4 +1,3 @@
-use crate::bosses::Boss;
 use crate::campaign::Zone;
 use crate::notes::Note;
 use crate::recipes::Recipe;
@@ -14,7 +13,6 @@ const MAX_PER_GROUP: usize = 6;
 pub fn compute_groups(
     notes: Vec<Note>,
     zones: Vec<Zone>,
-    bosses: Vec<Boss>,
     recipes: Vec<Recipe>,
     links: Vec<LinkRow>,
     query: &str,
@@ -35,7 +33,6 @@ pub fn compute_groups(
     push_group(&mut groups, "Notes", notes_matches);
 
     push_group(&mut groups, "Campaign zones", zone_matches(needle, &zones));
-    push_group(&mut groups, "Bosses", boss_matches(needle, &bosses));
     push_group(&mut groups, "Recipes", recipe_matches(needle, recipes));
     push_group(&mut groups, "Links", link_matches(needle, links));
 
@@ -60,27 +57,6 @@ fn zone_matches(needle: &str, zones: &[Zone]) -> Vec<Result> {
                 name: zone.name.clone(),
                 act_name: zone.act.clone(),
                 zone_id: zone.id.clone(),
-            });
-            if out.len() >= MAX_PER_GROUP {
-                return out;
-            }
-        }
-    }
-    out
-}
-
-fn boss_matches(needle: &str, bosses: &[Boss]) -> Vec<Result> {
-    let mut out = Vec::new();
-    for boss in bosses {
-        if needle.is_empty()
-            || boss.name.to_lowercase().contains(needle)
-            || boss.zone.to_lowercase().contains(needle)
-            || boss.category.to_lowercase().contains(needle)
-        {
-            out.push(Result::Boss {
-                name: boss.name.clone(),
-                zone_name: boss.zone.clone(),
-                act_name: boss.category.clone(),
             });
             if out.len() >= MAX_PER_GROUP {
                 return out;
