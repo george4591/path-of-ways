@@ -1,17 +1,15 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos::web_sys;
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::JsCast;
 
 use crate::app_state::use_app_state;
-use crate::icons::{DownloadIcon, PinIcon, SearchIcon, TrashIcon, UploadIcon};
+use crate::icons::{PinIcon, SearchIcon, TrashIcon};
 use crate::keyboard::use_escape_key;
 
 use super::context::use_notes_context;
 use super::markdown::render_inline_md;
 use super::model::{format_relative, now_ms, Note};
-use super::storage::{export_json, import_json, save_one, trigger_download};
+use super::storage::save_one;
 use super::templates::Template;
 
 #[component]
@@ -116,67 +114,37 @@ pub fn Sidebar() -> impl IntoView {
         });
     };
 
-    let do_export = move |_| {
-        let list = notes.get_untracked();
-        let json = export_json(&list);
-        let date = (now_ms() / 1000.0) as u64;
-        trigger_download(&format!("path-of-ways-notes-{}.json", date), &json);
-    };
-
-    let file_input_ref = NodeRef::<leptos::html::Input>::new();
-    let on_import_click = move |_| {
-        if let Some(input) = file_input_ref.get() {
-            input.click();
-        }
-    };
-
-    let on_file_change = move |ev: web_sys::Event| {
-        let Some(target) = ev.target() else { return };
-        let Ok(input) = target.dyn_into::<web_sys::HtmlInputElement>() else {
-            return;
-        };
-        let Some(files) = input.files() else { return };
-        let Some(file) = files.get(0) else { return };
-        input.set_value("");
-        let Ok(reader) = web_sys::FileReader::new() else {
-            return;
-        };
-        let reader_clone = reader.clone();
-        let set_pending_import = ctx.set_pending_import;
-        let onload = Closure::wrap(Box::new(move |_: web_sys::Event| {
-            let Ok(result) = reader_clone.result() else {
-                return;
-            };
-            let Some(text) = result.as_string() else {
-                return;
-            };
-            match import_json(&text) {
-                Ok(list) => set_pending_import.set(Some(list)),
-                Err(_) => {
-                    if let Some(window) = web_sys::window() {
-                        let _ = window.alert_with_message("Invalid notes JSON file.");
-                    }
-                }
-            }
-        }) as Box<dyn FnMut(_)>);
-        reader.set_onload(Some(onload.as_ref().unchecked_ref()));
-        let _ = reader.read_as_text(&file);
-        onload.forget();
-    };
-
     view! {
         <aside class="w-72 shrink-0 flex flex-col gap-2 pr-4 border-r border-border">
+            // ─── Search + New (single row) ─────────────────────────────
+            // Search takes the full width of the row, with a compact
+            // split-button on the right: `+` creates a blank note, `▾`
+            // opens the template picker. Import / Export moved to the
+            // global File menu in the title bar.
             <div class="flex gap-2">
-                <div class="relative flex-1">
+                <div class="relative flex-1 min-w-0">
+                    <input
+                        type="text"
+                        placeholder="Search notes…"
+                        class="w-full rounded-md border border-border bg-bg pl-8 pr-2 py-1.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                        prop:value=move || search_query.get()
+                        on:input=move |ev| set_search_query.set(event_target_value(&ev))
+                    />
+                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none">
+                        <SearchIcon class="w-4 h-4"/>
+                    </span>
+                </div>
+                <div class="relative shrink-0">
                     <div class="flex">
                         <button
-                            class="flex-1 inline-flex items-center justify-center gap-1 h-9 px-3 rounded-l-md bg-accent text-accent-fg hover:opacity-90 transition text-sm"
+                            class="inline-flex items-center justify-center w-9 h-9 rounded-l-md bg-accent text-accent-fg hover:opacity-90 transition text-sm font-semibold"
                             on:click=move |_| create_with_template(Template::Blank)
+                            title="New blank note (Ctrl+N)"
                         >
-                            "+ New note"
+                            "+"
                         </button>
                         <button
-                            class="inline-flex items-center justify-center h-9 px-2 rounded-r-md bg-accent text-accent-fg hover:opacity-90 transition border-l border-accent-fg/20 text-sm"
+                            class="inline-flex items-center justify-center w-6 h-9 rounded-r-md bg-accent text-accent-fg hover:opacity-90 transition border-l border-accent-fg/20 text-xs"
                             on:click=move |_| set_show_new_menu.update(|open| *open = !*open)
                             title="Choose a template"
                         >
@@ -188,7 +156,7 @@ pub fn Sidebar() -> impl IntoView {
                             class="fixed inset-0 z-40"
                             on:click=move |_| set_show_new_menu.set(false)
                         />
-                        <div class="absolute z-50 top-full mt-1 left-0 right-0 rounded-lg border border-border bg-bg-elevated shadow-2xl overflow-hidden">
+                        <div class="absolute z-50 top-full mt-1 right-0 w-56 rounded-lg border border-border bg-bg-elevated shadow-2xl overflow-hidden">
                             {[Template::Blank, Template::Build, Template::Boss].into_iter().map(|template| {
                                 view! {
                                     <button
@@ -203,39 +171,6 @@ pub fn Sidebar() -> impl IntoView {
                         </div>
                     </Show>
                 </div>
-                <button
-                    class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-transparent text-fg hover:bg-fg hover:text-bg transition"
-                    on:click=do_export
-                    title="Export notes (JSON)"
-                >
-                    <DownloadIcon class="w-4 h-4"/>
-                </button>
-                <button
-                    class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-transparent text-fg hover:bg-fg hover:text-bg transition"
-                    on:click=on_import_click
-                    title="Import notes (JSON)"
-                >
-                    <UploadIcon class="w-4 h-4"/>
-                </button>
-                <input
-                    node_ref=file_input_ref
-                    type="file"
-                    accept="application/json,.json"
-                    class="hidden"
-                    on:change=on_file_change
-                />
-            </div>
-            <div class="relative">
-                <input
-                    type="text"
-                    placeholder="Search notes…"
-                    class="w-full rounded-md border border-border bg-bg pl-8 pr-2 py-1.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
-                    prop:value=move || search_query.get()
-                    on:input=move |ev| set_search_query.set(event_target_value(&ev))
-                />
-                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-fg-muted">
-                    <SearchIcon class="w-4 h-4"/>
-                </span>
             </div>
             <Show when=move || !all_tags().is_empty()>
                 <div class="flex flex-wrap gap-1">

@@ -1,9 +1,12 @@
 use leptos::prelude::*;
 use leptos::web_sys;
+use leptos_router::components::A;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 
 use crate::app_state::{create_blank_note, use_app_state, Page};
+use crate::notes::{export_json, now_ms, trigger_download};
+use crate::theme::use_theme;
 
 fn is_tauri() -> bool {
     web_sys::window()
@@ -58,7 +61,7 @@ pub fn TitleBar() -> impl IntoView {
 
     view! {
         <div
-            class="flex items-stretch h-9 bg-bg-elevated border-b border-border select-none"
+            class="flex items-stretch h-9 bg-bg border-b border-border select-none"
             data-tauri-drag-region
         >
             <div
@@ -66,6 +69,13 @@ pub fn TitleBar() -> impl IntoView {
                 data-tauri-drag-region
             >
                 <span data-tauri-drag-region>"Path of Ways"</span>
+                <span
+                    class="text-xs text-fg-muted"
+                    data-tauri-drag-region
+                    title="App version"
+                >
+                        {format!("v{}", env!("CARGO_PKG_VERSION"))}
+                </span>
             </div>
 
             <FileMenu/>
@@ -73,10 +83,59 @@ pub fn TitleBar() -> impl IntoView {
 
             <div class="flex-1" data-tauri-drag-region></div>
 
-            <Show when=move || in_tauri>
-                <WindowControls />
-            </Show>
+            <PageTabs/>
+
+            <div class="flex-1" data-tauri-drag-region></div>
+
+            {if in_tauri {
+                view! { <WindowControls /> }.into_any()
+            } else {
+                // In browser dev there are no native window controls, but
+                // without anything taking up the right-hand chrome the
+                // flex-1 drag areas redistribute and the tabs drift right.
+                // Reserve the same width (3 × w-11 = 132px) so the layout
+                // is identical to the Tauri build.
+                view! { <div class="w-[132px]" data-tauri-drag-region></div> }.into_any()
+            }}
         </div>
+    }
+}
+
+#[component]
+fn PageTabs() -> impl IntoView {
+    view! {
+        <nav class="flex items-stretch">
+            <NavLink target=Page::Notes    label="Notes"    title="Notes (1)"/>
+            <NavLink target=Page::Campaign label="Campaign" title="Campaign (2)"/>
+            <NavLink target=Page::Recipes  label="Recipes"  title="Recipes (3)"/>
+            <NavLink target=Page::Links    label="Links"    title="Links (4)"/>
+        </nav>
+    }
+}
+
+/// One tab in the title bar's nav. Styled to match the File/View menu buttons
+/// so the whole title bar reads as one coherent chrome strip. Active tab is
+/// pinned-highlighted (same look as an opened menu) so the current page is
+/// obvious without breaking the visual rhythm.
+#[component]
+fn NavLink(
+    target: Page,
+    #[prop(into)] label: String,
+    #[prop(into)] title: String,
+) -> impl IntoView {
+    let app = use_app_state();
+    let class = move || {
+        let base = "px-3 inline-flex items-center text-sm transition no-underline";
+        if app.page.get() == target {
+            format!("{} bg-fg/10 text-fg", base)
+        } else {
+            format!("{} text-fg-muted hover:bg-fg/10 hover:text-fg", base)
+        }
+    };
+    view! {
+        <A href=target.route() attr:class=class attr:title=title>
+            {label}
+        </A>
     }
 }
 
@@ -188,6 +247,20 @@ fn MenuSeparator() -> impl IntoView {
 #[component]
 fn FileMenu() -> impl IntoView {
     let app = use_app_state();
+
+    let do_export = move || {
+        let list = app.notes.get_untracked();
+        let json = export_json(&list);
+        let date = (now_ms() / 1000.0) as u64;
+        trigger_download(&format!("path-of-ways-notes-{}.json", date), &json);
+    };
+
+    let do_import = move || {
+        // Increments the counter App's Effect watches; click is fired there.
+        app.set_trigger_import_picker
+            .update(|n| *n = n.wrapping_add(1));
+    };
+
     view! {
         <MenuButton label="File">
             <MenuItem
@@ -202,6 +275,15 @@ fn FileMenu() -> impl IntoView {
             />
             <MenuSeparator/>
             <MenuItem
+                label="Export notes…"
+                on_select=do_export
+            />
+            <MenuItem
+                label="Import notes…"
+                on_select=do_import
+            />
+            <MenuSeparator/>
+            <MenuItem
                 label="Quit"
                 on_select=move || close()
             />
@@ -212,6 +294,7 @@ fn FileMenu() -> impl IntoView {
 #[component]
 fn ViewMenu() -> impl IntoView {
     let app = use_app_state();
+    let theme = use_theme();
 
     view! {
         <MenuButton label="View">
@@ -220,6 +303,10 @@ fn ViewMenu() -> impl IntoView {
             <MenuItem label="Recipes"  shortcut="3" on_select=move || app.set_page.set(Page::Recipes)/>
             <MenuItem label="Links"    shortcut="4" on_select=move || app.set_page.set(Page::Links)/>
             <MenuSeparator/>
+            <MenuItem
+                label="Cycle Theme"
+                on_select=move || theme.cycle()
+            />
             <MenuItem
                 label="Help"
                 on_select=move || app.set_show_help.set(true)

@@ -178,7 +178,7 @@ pub fn Links() -> impl IntoView {
     };
 
     view! {
-        <section class="rounded-xl border border-border bg-bg-elevated p-6 h-[calc(100vh-7.75rem)] min-h-[28rem] overflow-auto">
+        <section class="p-6 h-[calc(100vh-2.25rem)] min-h-[28rem] overflow-auto">
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h2 class="text-2xl font-semibold text-fg m-0 mb-1">"Links"</h2>

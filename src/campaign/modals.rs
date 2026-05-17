@@ -31,7 +31,7 @@ pub struct ZoneDraft {
     pub checklist: Vec<ChecklistItem>,
 }
 
-const FIELD_CLASS: &str = "rounded-md border border-border bg-bg px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent text-sm";
+const FIELD_CLASS: &str = "rounded-md border border-border bg-bg px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent text-base";
 
 #[component]
 pub fn EditModal<C, K>(
@@ -136,7 +136,7 @@ where
             <h3 class="text-lg font-semibold text-fg mb-4 shrink-0">
                 {move || if is_edit() { "Edit zone" } else { "Add zone" }}
             </h3>
-            <div class="flex flex-col gap-3 flex-1 overflow-auto pr-1 -mr-2">
+            <div class="flex flex-col gap-3 flex-1 overflow-auto px-2 -mx-2">
                 <label class="flex flex-col gap-1">
                     <span class="text-xs text-fg-muted">"Act"</span>
                     <input

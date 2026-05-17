@@ -72,7 +72,6 @@ where
                         <Kbd label="2"/>
                         <Kbd label="3"/>
                         <Kbd label="4"/>
-                        <Kbd label="5"/>
                     </div>
                     <div class="text-fg-muted">"Switch tabs: Notes · Campaign · Recipes · Links (when not typing in a field)"</div>
 
@@ -119,6 +118,10 @@ where
                         "Paste an image directly while editing a note ("<Kbd label="Ctrl"/>" + "<Kbd label="V"/>") — it's stored locally in IndexedDB and embedded inline."
                     </li>
                 </ul>
+
+                <div class="mt-6 pt-3 border-t border-border text-xs text-fg-muted text-right">
+                    {format!("Path of Ways v{}", env!("CARGO_PKG_VERSION"))}
+                </div>
         </ModalShell>
     }
 }

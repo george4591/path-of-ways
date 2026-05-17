@@ -9,8 +9,6 @@ use crate::buttons::PrimaryButton;
 use crate::icons::{PencilIcon, TrashIcon};
 use crate::notes::{render_inline_md, Template};
 
-use crate::buttons::SecondaryButton;
-
 use super::modals::{DeleteModal, EditModal, ResetProgressModal, ZoneDraft};
 use super::model::{Zone, ZoneProgress};
 use super::storage::{
@@ -156,6 +154,17 @@ pub fn CampaignTracker() -> impl IntoView {
     };
 
     let open_add = move |_| set_editing.set(Some(ZoneDraft::default()));
+    // Per-act add — prefills the act name so the user doesn't have to retype
+    // it. Also auto-expands the act so the new zone (once added) is visible.
+    let open_add_in_act = move |act_name: String| {
+        set_expanded_acts.update(|set| {
+            set.insert(act_name.clone());
+        });
+        set_editing.set(Some(ZoneDraft {
+            act: act_name,
+            ..ZoneDraft::default()
+        }));
+    };
 
     let open_edit = move |zone: Zone| {
         set_editing.set(Some(ZoneDraft {
@@ -260,15 +269,20 @@ pub fn CampaignTracker() -> impl IntoView {
     };
 
     view! {
-        <section class="rounded-xl border border-border bg-bg-elevated p-6 h-[calc(100vh-7.75rem)] min-h-[28rem] overflow-auto">
+        <section class="p-6 h-[calc(100vh-2.25rem)] min-h-[28rem] overflow-auto">
             <div class="flex items-start justify-between gap-3 mb-6">
                 <div>
                     <h2 class="text-2xl font-semibold text-fg m-0 mb-1">"Campaign"</h2>
                     <p class="text-sm text-fg-muted m-0">"Zone progress per act. Tag zones to filter — e.g. \"Skill Gem\" or \"Boss\"."</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <SecondaryButton on_click=open_reset>"Reset progress"</SecondaryButton>
-                    <PrimaryButton on_click=open_add>"+ Add zone"</PrimaryButton>
+                    <button
+                        class="inline-flex items-center h-9 px-3 rounded-md border border-red-700/50 bg-transparent text-red-400 hover:bg-red-700/15 hover:border-red-600 hover:text-red-300 text-sm transition"
+                        on:click=open_reset
+                        title="Uncheck every checklist item across every zone"
+                    >
+                        "Reset progress"
+                    </button>
                 </div>
             </div>
 
@@ -352,11 +366,20 @@ pub fn CampaignTracker() -> impl IntoView {
                         {groups.into_iter().map(|(act_name, zones_in_act)| {
                             let act_for_summary = act_name.clone();
                             let act_for_manage = act_name.clone();
+                            let act_for_add = act_name.clone();
                             let act_for_class_check = act_name.clone();
                             let act_for_label_check = act_name.clone();
                             let act_for_expand_click = act_name.clone();
                             let act_for_expand_check = act_name.clone();
                             let act_for_rotation = act_name.clone();
+                            // Interludes are the "filler" acts between the main four; they get
+                            // a quieter visual treatment so the four main acts dominate the eye.
+                            let is_interlude = act_name.starts_with("Interlude:");
+                            let title_class = if is_interlude {
+                                "text-2xl text-fg-muted group-hover:text-accent m-0 truncate transition-colors"
+                            } else {
+                                "text-3xl text-fg group-hover:text-accent m-0 truncate transition-colors"
+                            };
                             let is_managing_class = move || managing_act.get().as_deref() == Some(act_for_class_check.as_str());
                             let is_managing_label = move || managing_act.get().as_deref() == Some(act_for_label_check.as_str());
                             let is_expanded = move || expanded_acts.with(|set| set.contains(&act_for_expand_check));
@@ -390,15 +413,34 @@ pub fn CampaignTracker() -> impl IntoView {
                                             >
                                                 <path d="M3 5 L7 9 L11 5"/>
                                             </svg>
-                                            <h3 class="text-3xl text-fg group-hover:text-accent m-0 truncate transition-colors">{act_name}</h3>
+                                            <h3 class=title_class>{act_name}</h3>
                                         </div>
                                         <div class="flex items-center gap-3 shrink-0">
-                                            <span class="text-xs text-fg-muted">
-                                                {move || {
-                                                    let (done, total) = act_summary(act_for_summary.clone());
-                                                    format!("{} / {}", done, total)
-                                                }}
-                                            </span>
+                                            {move || {
+                                                let (done, total) = act_summary(act_for_summary.clone());
+                                                // Don't show "0 / 0" before any checklist items
+                                                // exist — that's noise, not signal.
+                                                (total > 0).then(|| view! {
+                                                    <span class="text-xs text-fg-muted">
+                                                        {format!("{} / {}", done, total)}
+                                                    </span>
+                                                })
+                                            }}
+                                            <button
+                                                class="inline-flex items-center justify-center h-7 px-2 rounded-md border border-border bg-transparent text-fg-muted hover:text-accent hover:border-accent text-xs transition"
+                                                on:click={
+                                                    let act = act_for_add.clone();
+                                                    move |ev: web_sys::MouseEvent| {
+                                                        // Don't let the click bubble up and toggle the act's
+                                                        // expand/collapse state.
+                                                        ev.stop_propagation();
+                                                        open_add_in_act(act.clone());
+                                                    }
+                                                }
+                                                title="Add a zone to this act"
+                                            >
+                                                "+ Add zone"
+                                            </button>
                                             <button
                                                 class=move || {
                                                     let base = "inline-flex items-center gap-1 h-7 px-2 rounded-md border text-xs transition";

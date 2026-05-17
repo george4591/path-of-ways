@@ -24,6 +24,15 @@ pub struct AppState {
     pub set_show_quick_switcher: WriteSignal<bool>,
     pub show_help: ReadSignal<bool>,
     pub set_show_help: WriteSignal<bool>,
+    /// Parsed list of notes from a chosen import file, waiting for the user to
+    /// confirm the merge in the modal. `None` when no import is in flight.
+    pub pending_import: ReadSignal<Option<Vec<Note>>>,
+    pub set_pending_import: WriteSignal<Option<Vec<Note>>>,
+    /// Bumped every time something (currently just the File > Import menu
+    /// item) wants the global file picker opened. The App component's effect
+    /// watches this counter and clicks the hidden `<input type="file">`.
+    pub trigger_import_picker: ReadSignal<u32>,
+    pub set_trigger_import_picker: WriteSignal<u32>,
 }
 
 pub fn provide_app_state() -> AppState {
@@ -34,6 +43,8 @@ pub fn provide_app_state() -> AppState {
     let (edit_mode, set_edit_mode) = signal(false);
     let (show_quick_switcher, set_show_quick_switcher) = signal(false);
     let (show_help, set_show_help) = signal(false);
+    let (pending_import, set_pending_import) = signal::<Option<Vec<Note>>>(None);
+    let (trigger_import_picker, set_trigger_import_picker) = signal(0u32);
 
     let stored_id = read_last_selected_id();
     spawn_local(async move {
@@ -78,6 +89,10 @@ pub fn provide_app_state() -> AppState {
         set_show_quick_switcher,
         show_help,
         set_show_help,
+        pending_import,
+        set_pending_import,
+        trigger_import_picker,
+        set_trigger_import_picker,
     };
     provide_context(state);
     state

@@ -21,15 +21,19 @@ use campaign::CampaignTracker;
 use error_log::{install_log_state, ErrorBanner};
 use help::HelpModal;
 use leptos::prelude::*;
-use leptos_router::components::{Route, Router, Routes, A};
+use leptos::task::spawn_local;
+use leptos::web_sys;
+use leptos_router::components::{Route, Router, Routes};
 use leptos_router::hooks::{use_location, use_navigate};
 use leptos_router::path;
 use links::Links;
-use notes::Notes;
+use notes::{import_json, save_many, ImportModal, Notes};
 use recipes::Recipes;
 use search::QuickSwitcher;
-use theme::{provide_theme_context, use_theme};
+use theme::provide_theme_context;
 use titlebar::TitleBar;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
 
 fn main() {
     error_log::install_panic_hook();
@@ -44,12 +48,101 @@ fn App() -> impl IntoView {
     let app = provide_app_state();
     keyboard::install_global_shortcuts(app);
 
+    // ─── Notes import flow (App-level) ───────────────────────────────────
+    //
+    // The hidden file input + onChange handler + ImportModal live here so
+    // File > Import (in the title bar) works regardless of which tab is
+    // currently active. The picker click is driven by `trigger_import_picker`
+    // counter on AppState — File menu bumps it, this effect reacts.
+
+    let file_input_ref = NodeRef::<leptos::html::Input>::new();
+
+    Effect::new(move |prev: Option<u32>| {
+        let curr = app.trigger_import_picker.get();
+        if prev.is_some() && prev != Some(curr) {
+            if let Some(input) = file_input_ref.get_untracked() {
+                input.click();
+            }
+        }
+        curr
+    });
+
+    let on_file_change = move |ev: web_sys::Event| {
+        let Some(target) = ev.target() else { return };
+        let Ok(input) = target.dyn_into::<web_sys::HtmlInputElement>() else {
+            return;
+        };
+        let Some(files) = input.files() else { return };
+        let Some(file) = files.get(0) else { return };
+        // Clear the value so re-picking the same file fires `change` again.
+        input.set_value("");
+        let Ok(reader) = web_sys::FileReader::new() else {
+            return;
+        };
+        let reader_clone = reader.clone();
+        let set_pending_import = app.set_pending_import;
+        let onload = Closure::wrap(Box::new(move |_: web_sys::Event| {
+            let Ok(result) = reader_clone.result() else { return };
+            let Some(text) = result.as_string() else { return };
+            match import_json(&text) {
+                Ok(list) => set_pending_import.set(Some(list)),
+                Err(_) => {
+                    if let Some(window) = web_sys::window() {
+                        let _ = window.alert_with_message("Invalid notes JSON file.");
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(_)>);
+        reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+        let _ = reader.read_as_text(&file);
+        onload.forget();
+    };
+
+    let cancel_import = move || app.set_pending_import.set(None);
+
+    let confirm_import = move || {
+        let Some(incoming) = app.pending_import.get_untracked() else {
+            return;
+        };
+        let mut merged = app.notes.get_untracked();
+        let mut to_save = Vec::with_capacity(incoming.len());
+        for inc in incoming {
+            if let Some(pos) = merged.iter().position(|note| note.id == inc.id) {
+                merged[pos] = inc.clone();
+            } else {
+                merged.push(inc.clone());
+            }
+            to_save.push(inc);
+        }
+        app.set_notes.set(merged);
+        spawn_local(async move {
+            save_many(to_save).await;
+        });
+        app.set_pending_import.set(None);
+    };
+
+    let import_summary = move || {
+        let Some(incoming) = app.pending_import.get() else {
+            return (0usize, 0usize);
+        };
+        let existing = app.notes.get();
+        let mut new_count = 0;
+        let mut update_count = 0;
+        for inc in &incoming {
+            if existing.iter().any(|note| note.id == inc.id) {
+                update_count += 1;
+            } else {
+                new_count += 1;
+            }
+        }
+        (new_count, update_count)
+    };
+
     view! {
         <Router>
             <TitleBar/>
-            <main class="p-3">
+            <main class="bg-bg-elevated">
                 <RouteSync/>
-                <NavBar/>
                 <Routes fallback=|| view! { <p class="text-fg-muted">"Page not found."</p> }>
                     <Route path=path!("/") view=Notes/>
                     <Route path=path!("/notes") view=Notes/>
@@ -63,7 +156,21 @@ fn App() -> impl IntoView {
                 <Show when=move || app.show_help.get()>
                     <HelpModal close=move || app.set_show_help.set(false)/>
                 </Show>
+                <Show when=move || app.pending_import.get().is_some()>
+                    <ImportModal
+                        summary=Signal::derive(import_summary)
+                        cancel=cancel_import
+                        confirm=confirm_import
+                    />
+                </Show>
             </main>
+            <input
+                node_ref=file_input_ref
+                type="file"
+                accept="application/json,.json"
+                class="hidden"
+                on:change=on_file_change
+            />
             <ErrorBanner/>
         </Router>
     }
@@ -100,73 +207,3 @@ fn RouteSync() -> impl IntoView {
     view! {}
 }
 
-#[component]
-fn NavBar() -> impl IntoView {
-    let app = use_app_state();
-    view! {
-        <div class="flex items-center justify-between mb-3 gap-3 pb-3 border-b border-border">
-            <PageTabs/>
-            <div class="flex items-center gap-2">
-                <button
-                    class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-bg-elevated text-fg border border-border hover:bg-fg hover:text-bg transition text-sm font-semibold"
-                    on:click=move |_| app.set_show_help.set(true)
-                    title="Help & shortcuts"
-                >
-                    "?"
-                </button>
-                <ThemeToggle/>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn PageTabs() -> impl IntoView {
-    view! {
-        <nav class="flex gap-2">
-            <NavLink target=Page::Notes label="Notes" title="Notes (1)"/>
-            <NavLink target=Page::Campaign label="Campaign" title="Campaign (2)"/>
-            <NavLink target=Page::Recipes label="Recipes" title="Recipes (3)"/>
-            <NavLink target=Page::Links label="Links" title="Links (4)"/>
-        </nav>
-    }
-}
-
-#[component]
-fn NavLink(
-    target: Page,
-    #[prop(into)] label: String,
-    #[prop(into)] title: String,
-) -> impl IntoView {
-    let app = use_app_state();
-    let class = move || {
-        let base = "inline-flex items-center h-9 px-3 rounded-md border text-sm transition no-underline";
-        if app.page.get() == target {
-            format!("{} bg-accent text-accent-fg border-accent", base)
-        } else {
-            format!(
-                "{} bg-transparent text-fg border-border hover:bg-fg hover:text-bg",
-                base
-            )
-        }
-    };
-    view! {
-        <A href=target.route() attr:class=class attr:title=title>
-            {label}
-        </A>
-    }
-}
-
-#[component]
-fn ThemeToggle() -> impl IntoView {
-    let ctx = use_theme();
-    view! {
-        <button
-            class="inline-flex items-center h-9 px-3 rounded-md bg-bg-elevated text-fg border border-border hover:bg-fg hover:text-bg transition text-sm"
-            on:click=move |_| ctx.cycle()
-            title="Cycle theme"
-        >
-            {move || format!("Theme: {}", ctx.theme.get().label())}
-        </button>
-    }
-}
