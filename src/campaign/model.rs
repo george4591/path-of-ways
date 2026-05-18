@@ -3,6 +3,42 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Standard tag categories the app understands out-of-the-box. Used in two
+/// places: (1) the quick-add chips in the zone edit modal, and (2) the
+/// always-visible pills in the campaign filter bar (which seed with these
+/// even when no zone is using them yet, so the filter row has consistent
+/// presence). Keep in sync with `tag_color_classes` below.
+pub const COMMON_TAGS: &[&str] = &[
+    "Skill Gem",
+    "Skill Point",
+    "Spirit",
+    "Boss",
+    "Quest",
+    "Side Area",
+    "Waypoint",
+];
+
+/// Pick a Tailwind color set for a tag based on a small palette of well-known
+/// PoE2 reward types — so "Skill Gem" tags read green at a glance, "Boss" red,
+/// etc. Custom/unknown tags fall back to the app's accent color.
+///
+/// Returns a string of `bg-* text-* border-*` classes ready to drop next to
+/// the layout classes on the tag pill. Lives in `model` so both the campaign
+/// view (zone-card tags, filter bar) and the campaign edit modal (applied-tag
+/// pills, quick-add chips) can share the same palette.
+pub fn tag_color_classes(tag: &str) -> &'static str {
+    match tag {
+        "Skill Gem" => "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+        "Skill Point" => "bg-amber-500/15 text-amber-300 border-amber-500/30",
+        "Spirit" => "bg-violet-500/15 text-violet-300 border-violet-500/30",
+        "Boss" => "bg-red-500/15 text-red-300 border-red-500/30",
+        "Quest" => "bg-sky-500/15 text-sky-300 border-sky-500/30",
+        "Side Area" => "bg-slate-500/15 text-slate-300 border-slate-500/30",
+        "Waypoint" => "bg-orange-500/15 text-orange-300 border-orange-500/30",
+        _ => "bg-accent/15 text-accent border-accent/30",
+    }
+}
+
 /// A single freeform checklist entry on a zone — arbitrary label + a stable id
 /// so the corresponding `ZoneProgress.done_items` entry survives renames.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]

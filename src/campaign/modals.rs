@@ -5,20 +5,7 @@ use crate::buttons::{DangerButton, PrimaryButton, SecondaryButton};
 use crate::icons::TrashIcon;
 use crate::modal::ModalShell;
 
-use super::model::ChecklistItem;
-
-/// Quick-add chips shown under the tag input. Tapping one appends the tag to
-/// the draft (if not already present). Pure convenience — users can type any
-/// custom tag they want.
-const COMMON_TAGS: &[&str] = &[
-    "Skill Gem",
-    "Skill Point",
-    "Spirit",
-    "Boss",
-    "Quest",
-    "Side Area",
-    "Waypoint",
-];
+use super::model::{tag_color_classes, ChecklistItem, COMMON_TAGS};
 
 #[derive(Clone, Default)]
 pub struct ZoneDraft {
@@ -138,7 +125,7 @@ where
             </h3>
             <div class="flex flex-col gap-3 flex-1 overflow-auto px-2 -mx-2">
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Act"</span>
+                    <span class="text-sm text-fg-muted">"Act"</span>
                     <input
                         type="text"
                         placeholder="e.g. Act 1: The Riverbank"
@@ -148,7 +135,7 @@ where
                     />
                 </label>
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Zone name"</span>
+                    <span class="text-sm text-fg-muted">"Zone name"</span>
                     <input
                         type="text"
                         placeholder="e.g. Clearfell"
@@ -160,7 +147,7 @@ where
 
                 // ─── Tags ────────────────────────────────────────────────
                 <div class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Tags"</span>
+                    <span class="text-sm text-fg-muted">"Tags"</span>
                     <Show when=move || !tags.with(|list| list.is_empty())>
                         <div class="flex flex-wrap gap-1">
                             <For
@@ -168,11 +155,14 @@ where
                                 key=|tag| tag.clone()
                                 let:tag
                             >
-                                <span class="inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent border border-accent/30 px-2 py-0.5 text-xs">
+                                <span class=format!(
+                                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs {}",
+                                    tag_color_classes(&tag),
+                                )>
                                     {tag.clone()}
                                     <button
                                         type="button"
-                                        class="hover:text-fg leading-none"
+                                        class="hover:brightness-125 leading-none"
                                         on:click={
                                             let tag = tag.clone();
                                             move |_| remove_tag(tag.clone())
@@ -211,6 +201,9 @@ where
                         {COMMON_TAGS.iter().map(|tag| {
                             let tag_string = tag.to_string();
                             let tag_for_view = tag.to_string();
+                            // Preview the final tag color on the chip so the
+                            // user knows what they'll get before clicking.
+                            let color_classes = tag_color_classes(tag);
                             let already_has = Signal::derive(move || {
                                 draft.get()
                                     .map(|current| current.tags.iter().any(|t| t == &tag_string))
@@ -222,9 +215,10 @@ where
                                     class=move || {
                                         let base = "text-xs px-2 py-0.5 rounded-full border transition";
                                         if already_has.get() {
+                                            // Already applied: dim it and lock it out, regardless of category color.
                                             format!("{} bg-fg/10 text-fg-muted border-border opacity-50 cursor-default", base)
                                         } else {
-                                            format!("{} bg-transparent text-fg-muted border-border hover:text-fg hover:border-fg", base)
+                                            format!("{} {} hover:brightness-125", base, color_classes)
                                         }
                                     }
                                     disabled=move || already_has.get()
@@ -242,7 +236,7 @@ where
 
                 // ─── Checklist ───────────────────────────────────────────
                 <div class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Checklist"</span>
+                    <span class="text-sm text-fg-muted">"Checklist"</span>
                     <div class="flex flex-col gap-2">
                         <For
                             each=move || items.get()

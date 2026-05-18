@@ -90,6 +90,15 @@ where
                     <div class="text-fg-muted">"Open / close the global quick switcher (search across everything)"</div>
 
                     <div class="flex flex-wrap gap-1">
+                        <Kbd label="Ctrl"/>
+                        <span class="text-fg-muted">"+"</span>
+                        <Kbd label="Shift"/>
+                        <span class="text-fg-muted">"+"</span>
+                        <Kbd label="K"/>
+                    </div>
+                    <div class="text-fg-muted">"Open / close the quick switcher scoped to the current tab"</div>
+
+                    <div class="flex flex-wrap gap-1">
                         <Kbd label="Esc"/>
                     </div>
                     <div class="text-fg-muted">"Close the quick switcher (when focused in its input)"</div>

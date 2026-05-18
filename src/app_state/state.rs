@@ -22,6 +22,11 @@ pub struct AppState {
     pub set_edit_mode: WriteSignal<bool>,
     pub show_quick_switcher: ReadSignal<bool>,
     pub set_show_quick_switcher: WriteSignal<bool>,
+    /// When `Some(page)`, the quick switcher only shows results from that
+    /// page (triggered by Ctrl+Shift+K). When `None`, it shows everything
+    /// (Ctrl+K — the existing global behavior).
+    pub quick_switcher_scope: ReadSignal<Option<Page>>,
+    pub set_quick_switcher_scope: WriteSignal<Option<Page>>,
     pub show_help: ReadSignal<bool>,
     pub set_show_help: WriteSignal<bool>,
     /// Parsed list of notes from a chosen import file, waiting for the user to
@@ -42,6 +47,7 @@ pub fn provide_app_state() -> AppState {
     let (selected_note_id, set_selected_note_id) = signal(None::<String>);
     let (edit_mode, set_edit_mode) = signal(false);
     let (show_quick_switcher, set_show_quick_switcher) = signal(false);
+    let (quick_switcher_scope, set_quick_switcher_scope) = signal::<Option<Page>>(None);
     let (show_help, set_show_help) = signal(false);
     let (pending_import, set_pending_import) = signal::<Option<Vec<Note>>>(None);
     let (trigger_import_picker, set_trigger_import_picker) = signal(0u32);
@@ -87,6 +93,8 @@ pub fn provide_app_state() -> AppState {
         set_edit_mode,
         show_quick_switcher,
         set_show_quick_switcher,
+        quick_switcher_scope,
+        set_quick_switcher_scope,
         show_help,
         set_show_help,
         pending_import,

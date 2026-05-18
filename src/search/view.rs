@@ -44,14 +44,43 @@ pub fn QuickSwitcher() -> impl IntoView {
 
     use_escape_key(close);
 
+    // Compute the result groups, then optionally filter down to just the
+    // current page's group when the switcher was opened in scoped mode
+    // (Ctrl+Shift+K). When `quick_switcher_scope` is None, this is the
+    // global Ctrl+K behavior — every group renders.
     let groups = move || {
-        compute_groups(
+        let computed = compute_groups(
             app.notes.get(),
             zones.get(),
             recipes.get(),
             links.get(),
             &query.get(),
-        )
+        );
+        match app.quick_switcher_scope.get() {
+            Some(page) => computed
+                .into_iter()
+                .filter(|(label, _)| label_matches_page(label, page))
+                .collect(),
+            None => computed,
+        }
+    };
+
+    // Placeholder and footer text adapt to scoped vs global mode so the
+    // user always knows what they're searching.
+    let placeholder = move || -> String {
+        match app.quick_switcher_scope.get() {
+            Some(Page::Notes) => "Search notes…".to_string(),
+            Some(Page::Campaign) => "Search campaign zones…".to_string(),
+            Some(Page::Recipes) => "Search recipes…".to_string(),
+            Some(Page::Links) => "Search links…".to_string(),
+            None => "Search notes, zones, recipes, links…".to_string(),
+        }
+    };
+    let footer_hint = move || -> &'static str {
+        match app.quick_switcher_scope.get() {
+            Some(_) => "Ctrl+Shift+K to toggle · Ctrl+K for everywhere · Esc to close",
+            None => "Ctrl+K to toggle · Ctrl+Shift+K for current tab · Esc to close",
+        }
     };
 
     let on_pick = move |result: Result| {
@@ -83,7 +112,7 @@ pub fn QuickSwitcher() -> impl IntoView {
                     <input
                         node_ref=input_ref
                         type="text"
-                        placeholder="Search notes, zones, recipes, links…"
+                        placeholder=placeholder
                         class="w-full rounded-md bg-bg border border-border px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
                         prop:value=move || query.get()
                         on:input=move |ev| set_query.set(event_target_value(&ev))
@@ -112,7 +141,7 @@ pub fn QuickSwitcher() -> impl IntoView {
                     }}
                 </div>
                 <div class="px-3 py-2 border-t border-border text-xs text-fg-muted">
-                    "Ctrl+K to toggle · Esc to close"
+                    {footer_hint}
                 </div>
             </div>
         </div>
@@ -161,4 +190,16 @@ where
             </button>
         </li>
     }
+}
+
+/// Maps a group label (as produced by `compute_groups`) to the Page it belongs
+/// to. Used by scoped quick-switcher mode to filter groups down to one.
+fn label_matches_page(label: &str, page: Page) -> bool {
+    matches!(
+        (label, page),
+        ("Notes", Page::Notes)
+            | ("Campaign zones", Page::Campaign)
+            | ("Recipes", Page::Recipes)
+            | ("Links", Page::Links)
+    )
 }

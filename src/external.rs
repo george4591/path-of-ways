@@ -8,8 +8,6 @@ fn is_tauri() -> bool {
         .unwrap_or(false)
 }
 
-use wasm_bindgen::prelude::*;
-
 pub fn open_external(url: &str) {
     if !is_tauri() {
         if let Some(window) = web_sys::window() {

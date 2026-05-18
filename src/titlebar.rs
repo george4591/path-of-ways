@@ -61,23 +61,32 @@ pub fn TitleBar() -> impl IntoView {
 
     view! {
         <div
-            class="flex items-stretch h-9 bg-bg border-b border-border select-none"
+            class="flex items-stretch h-9 bg-bg border-b-2 border-border select-none"
             data-tauri-drag-region
         >
             <div
                 class="flex items-center px-3 gap-2 text-sm text-fg-muted font-medium"
                 data-tauri-drag-region
             >
-
+                <AppIcon/>
                 <span class="font-bold" data-tauri-drag-region>"Path of Ways"</span>
                 <span
                     class="text-xs text-fg-muted"
                     data-tauri-drag-region
                     title="App version"
                 >
-                        {format!("[v{}]", env!("CARGO_PKG_VERSION"))}
+                    {format!("[v{}]", env!("CARGO_PKG_VERSION"))}
                 </span>
             </div>
+
+            // Thin vertical divider between the app-identity block (icon +
+            // title + version) and the action menus. Without this, the
+            // title text and "File" / "View" blur into a single label
+            // stripe.
+            <div
+                class="self-center w-px h-5 bg-border mx-1"
+                data-tauri-drag-region
+            ></div>
 
             <FileMenu/>
             <ViewMenu/>
@@ -97,6 +106,37 @@ pub fn TitleBar() -> impl IntoView {
     }
 }
 
+/// Small inline rendition of the forking-paths app icon — same silhouette as
+/// `src-tauri/icons/source.svg` but stripped to a clean line drawing so it
+/// scales cleanly at title-bar size and inherits the current theme's accent
+/// color via `currentColor`.
+#[component]
+fn AppIcon() -> impl IntoView {
+    view! {
+        <svg
+            viewBox="0 0 24 24"
+            class="w-5 h-5 text-accent shrink-0"
+            attr:data-tauri-drag-region=""
+        >
+            <g
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M12 19 L12 6"/>
+                <path d="M12 19 C 12 14 8 9 4 6"/>
+                <path d="M12 19 C 12 14 16 9 20 6"/>
+            </g>
+            <circle cx="12" cy="19" r="2" fill="currentColor"/>
+            <circle cx="12" cy="5"  r="1.5" fill="currentColor"/>
+            <circle cx="4"  cy="5"  r="1.5" fill="currentColor"/>
+            <circle cx="20" cy="5"  r="1.5" fill="currentColor"/>
+        </svg>
+    }
+}
+
 #[component]
 fn PageTabs() -> impl IntoView {
     view! {
@@ -109,6 +149,11 @@ fn PageTabs() -> impl IntoView {
     }
 }
 
+/// Inactive tabs blend with the chrome (muted text + hover fill). The
+/// active tab uses the theme accent for both its text and a 2px underline
+/// pinned to the bottom edge of the title bar — the classic browser-tab
+/// "you are here" marker. `relative` on the anchor lets the underline
+/// position absolutely to the tab's own bounds.
 #[component]
 fn NavLink(
     target: Page,
@@ -116,10 +161,12 @@ fn NavLink(
     #[prop(into)] title: String,
 ) -> impl IntoView {
     let app = use_app_state();
+    let is_active_for_class = move || app.page.get() == target;
+    let is_active_for_show = move || app.page.get() == target;
     let class = move || {
-        let base = "px-3 inline-flex items-center text-sm transition no-underline";
-        if app.page.get() == target {
-            format!("{} bg-fg/10 text-fg", base)
+        let base = "relative px-3 inline-flex items-center text-sm transition no-underline";
+        if is_active_for_class() {
+            format!("{} text-accent font-medium", base)
         } else {
             format!("{} text-fg-muted hover:bg-fg/10 hover:text-fg", base)
         }
@@ -127,6 +174,9 @@ fn NavLink(
     view! {
         <A href=target.route() attr:class=class attr:title=title>
             {label}
+            <Show when=is_active_for_show>
+                <span class="absolute left-2 right-2 -bottom-px h-0.5 bg-accent pointer-events-none"/>
+            </Show>
         </A>
     }
 }
@@ -194,8 +244,13 @@ fn MenuButton(#[prop(into)] label: String, children: ChildrenFn) -> impl IntoVie
                 {label}
             </button>
             <Show when=move || open.get()>
+                // Use `bg-bg` (darker) instead of `bg-bg-elevated` so the
+                // dropdown contrasts with the now-elevated main content area
+                // — visually it reads as the title bar extending downward.
+                // `shadow-2xl` gives a proper "floating above content" depth
+                // cue so the panel doesn't blur into whatever's below it.
                 <div
-                    class="absolute top-full left-0 z-50 min-w-[12rem] rounded-md border border-border bg-bg-elevated shadow-lg py-1 mt-px"
+                    class="absolute top-full left-0 z-50 min-w-[12rem] rounded-md border border-border bg-bg shadow-2xl py-1 mt-px"
                     on:click=move |_| close_menu()
                 >
                     {children()}

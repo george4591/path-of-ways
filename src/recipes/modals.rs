@@ -45,7 +45,7 @@ where
             </h3>
             <div class="flex flex-col gap-3">
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Name"</span>
+                    <span class="text-sm text-fg-muted">"Name"</span>
                     <input
                         type="text"
                         placeholder="e.g. Transmutation Orb"
@@ -55,7 +55,7 @@ where
                     />
                 </label>
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Category"</span>
+                    <span class="text-sm text-fg-muted">"Category"</span>
                     <input
                         type="text"
                         placeholder="Currency · Equipment · Maps · Misc · …"
@@ -65,7 +65,7 @@ where
                     />
                 </label>
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Ingredients (one per line)"</span>
+                    <span class="text-sm text-fg-muted">"Ingredients (one per line)"</span>
                     <textarea
                         class="rounded-md border border-border bg-bg px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent text-sm resize-none font-mono"
                         rows="4"
@@ -75,7 +75,7 @@ where
                     />
                 </label>
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Result"</span>
+                    <span class="text-sm text-fg-muted">"Result"</span>
                     <input
                         type="text"
                         placeholder="1 Transmutation Orb"
@@ -85,7 +85,7 @@ where
                     />
                 </label>
                 <label class="flex flex-col gap-1">
-                    <span class="text-xs text-fg-muted">"Note (optional)"</span>
+                    <span class="text-sm text-fg-muted">"Note (optional)"</span>
                     <textarea
                         class="rounded-md border border-border bg-bg px-3 py-2 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent text-sm resize-none"
                         rows="2"

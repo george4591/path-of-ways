@@ -30,21 +30,24 @@ where
             class="relative group rounded-lg border border-border bg-bg p-3 hover:border-accent transition cursor-pointer"
             on:click=move |_| on_open(url.clone())
         >
+            // Single flex row: bigger favicon on the left as the visual
+            // anchor, all text (title, domain, optional description) stacked
+            // in the right column so the description has a clear parent.
             <div class="flex items-start gap-3">
                 <img
                     src=link.favicon_url()
                     alt=""
-                    class="w-8 h-8 rounded shrink-0 mt-0.5"
+                    class="w-12 h-12 rounded shrink-0 self-start"
                     loading="lazy"
                 />
                 <div class="min-w-0 flex-1">
                     <div class="font-medium text-fg truncate" inner_html=title_html></div>
                     <div class="text-xs text-fg-muted truncate">{link.domain().to_string()}</div>
+                    {has_description.then(|| view! {
+                        <div class="text-sm text-fg-muted mt-1 line-clamp-2" inner_html=description_html></div>
+                    })}
                 </div>
             </div>
-            {has_description.then(|| view! {
-                <div class="text-sm text-fg-muted mt-2 line-clamp-2" inner_html=description_html></div>
-            })}
             <div class="absolute top-2 right-2 hidden group-hover:flex gap-0.5">
                 <button
                     class="inline-flex items-center justify-center w-6 h-6 rounded bg-bg-elevated border border-border text-fg-muted hover:text-fg"
@@ -179,11 +182,8 @@ pub fn Links() -> impl IntoView {
 
     view! {
         <section class="p-6 h-[calc(100vh-2.25rem)] min-h-[28rem] overflow-auto">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h2 class="text-2xl font-semibold text-fg m-0 mb-1">"Links"</h2>
-                    <p class="text-sm text-fg-muted m-0">"Useful sites for builds, trade, references."</p>
-                </div>
+            // Single top action. Use Ctrl+Shift+K to search within this tab.
+            <div class="flex justify-end mb-3">
                 <PrimaryButton on_click=open_add>"+ Add link"</PrimaryButton>
             </div>
 

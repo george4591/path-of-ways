@@ -130,14 +130,6 @@ pub fn Recipes() -> impl IntoView {
 
     view! {
         <section class="p-6 h-[calc(100vh-2.25rem)] min-h-[28rem] overflow-auto">
-            <div class="flex items-start justify-between gap-3 mb-6">
-                <div>
-                    <h2 class="text-2xl font-semibold text-fg m-0 mb-1">"Vendor recipes"</h2>
-                    <p class="text-sm text-fg-muted m-0">"Add your own — recipes are saved locally."</p>
-                </div>
-                <PrimaryButton on_click=open_add>"+ Add recipe"</PrimaryButton>
-            </div>
-
             {move || {
                 if !loaded.get() {
                     return view! { <div/> }.into_any();
@@ -153,12 +145,23 @@ pub fn Recipes() -> impl IntoView {
                 } else {
                     view! {
                         <div class="space-y-8">
-                            {groups.into_iter().map(|(category, recipes_in_category)| {
+                            // Each category gets a "text + horizontal rule"
+                            // header. The first one carries the global
+                            // "+ Add recipe" button on the right of its rule
+                            // so it has visual context. Use Ctrl+Shift+K to
+                            // search within this tab.
+                            {groups.into_iter().enumerate().map(|(index, (category, recipes_in_category))| {
+                                let is_first = index == 0;
                                 view! {
                                     <div>
-                                        <h3 class="text-lg font-medium text-fg-muted m-0 mb-3 pb-1 border-b border-border">
-                                            {category}
-                                        </h3>
+                                        <div class="flex items-baseline justify-between gap-3 pb-1 mb-3 border-b border-border">
+                                            <h3 class="text-lg font-medium text-fg-muted m-0">
+                                                {category}
+                                            </h3>
+                                            {is_first.then(|| view! {
+                                                <PrimaryButton on_click=open_add>"+ Add recipe"</PrimaryButton>
+                                            })}
+                                        </div>
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {recipes_in_category.into_iter().map(|recipe| {
                                                 view! {

@@ -10,7 +10,7 @@ use crate::icons::{PencilIcon, TrashIcon};
 use crate::notes::{render_inline_md, Template};
 
 use super::modals::{DeleteModal, EditModal, ResetProgressModal, ZoneDraft};
-use super::model::{Zone, ZoneProgress};
+use super::model::{tag_color_classes, Zone, ZoneProgress, COMMON_TAGS};
 use super::storage::{
     clear_all_progress, delete_zone, load_progress, load_zones, save_zone,
     save_zone_progress,
@@ -26,11 +26,30 @@ pub fn CampaignTracker() -> impl IntoView {
     let (managing_act, set_managing_act) = signal::<Option<String>>(None);
     let (loaded, set_loaded) = signal(false);
     // Tags currently selected as filters. Empty set = show everything.
-    let (selected_tags, set_selected_tags) = signal(HashSet::<String>::new());
+    // Persisted to localStorage so a user's filter choice survives reloads.
+    let (selected_tags, set_selected_tags) = signal(read_string_set(LS_SELECTED_TAGS));
     // Names of acts currently expanded. Empty = everything collapsed (default).
-    let (expanded_acts, set_expanded_acts) = signal(HashSet::<String>::new());
+    // Also persisted so the user's chosen "open" state isn't lost on reload.
+    let (expanded_acts, set_expanded_acts) = signal(read_string_set(LS_EXPANDED_ACTS));
     // Toggles the "Reset all progress" confirmation modal.
     let (pending_reset, set_pending_reset) = signal(false);
+
+    // Write-through effects. The `prev.is_some()` guard skips the first run
+    // so we don't pointlessly rewrite the same value we just read on init.
+    Effect::new(move |prev: Option<HashSet<String>>| {
+        let current = selected_tags.get();
+        if prev.is_some() {
+            write_string_set(LS_SELECTED_TAGS, &current);
+        }
+        current
+    });
+    Effect::new(move |prev: Option<HashSet<String>>| {
+        let current = expanded_acts.get();
+        if prev.is_some() {
+            write_string_set(LS_EXPANDED_ACTS, &current);
+        }
+        current
+    });
 
     let toggle_act_expanded = move |act: String| {
         set_expanded_acts.update(|set| {
@@ -106,12 +125,18 @@ pub fn CampaignTracker() -> impl IntoView {
         map
     };
 
-    // All distinct tags across every zone, alphabetically — used to render
-    // the filter bar. Tag counts use the full zone list (unfiltered) so the
-    // numbers don't shift around as you toggle filters.
+    // Tags shown in the filter bar, alphabetically. Pre-seeded with the
+    // standard `COMMON_TAGS` so the bar always has presence — even on a
+    // brand-new install with no tagged zones yet — and any custom tags
+    // the user has added get appended on top of that baseline. Counts
+    // use the full unfiltered zone list so numbers don't shift as the
+    // user toggles other filters.
     let all_tags = move || -> Vec<(String, usize)> {
         let zones_list = zones.get();
         let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+        for tag in COMMON_TAGS {
+            counts.insert((*tag).to_string(), 0);
+        }
         for zone in &zones_list {
             // Track each tag once per zone, so 5 zones with "Boss" = count 5.
             let unique: BTreeSet<&String> = zone.tags.iter().collect();
@@ -270,39 +295,30 @@ pub fn CampaignTracker() -> impl IntoView {
 
     view! {
         <section class="p-6 h-[calc(100vh-2.25rem)] min-h-[28rem] overflow-auto">
-            <div class="flex items-start justify-between gap-3 mb-6">
-                <div>
-                    <h2 class="text-2xl font-semibold text-fg m-0 mb-1">"Campaign"</h2>
-                    <p class="text-sm text-fg-muted m-0">"Zone progress per act. Tag zones to filter — e.g. \"Skill Gem\" or \"Boss\"."</p>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <button
-                        class="inline-flex items-center h-9 px-3 rounded-md border border-red-700/50 bg-transparent text-red-400 hover:bg-red-700/15 hover:border-red-600 hover:text-red-300 text-sm transition"
-                        on:click=open_reset
-                        title="Uncheck every checklist item across every zone"
-                    >
-                        "Reset progress"
-                    </button>
-                </div>
-            </div>
-
-            // ─── Filter bar ──────────────────────────────────────────────
+            // ─── Top bar: filter pills (left) + Reset progress (right) ─
+            //
+            // The page title + description used to live here; they were
+            // redundant with the active title-bar tab and visually weaker
+            // than the act headers below. Reset progress moved into this
+            // row so the section starts straight in the content.
             {move || {
                 if !loaded.get() {
                     return view! { <div/> }.into_any();
                 }
                 let tags = all_tags();
-                if tags.is_empty() {
-                    return view! { <div/> }.into_any();
-                }
                 view! {
-                    <div class="flex flex-wrap items-center gap-1 mb-5 pb-3 border-b border-border">
-                        <span class="text-xs text-fg-muted mr-2">"Filter:"</span>
+                    <div class="flex flex-wrap items-center gap-2 mb-5 pb-3 border-b border-border">
+                        <span class="text-xs text-fg-muted mr-1">"Filter:"</span>
                         {tags.into_iter().map(|(tag, count)| {
                             let tag_for_class = tag.clone();
                             let tag_for_click = tag.clone();
                             let color_classes = tag_color_classes(&tag);
                             let is_selected = move || selected_tags.get().contains(&tag_for_class);
+                            // Pills with zero matching zones still render so
+                            // the filter bar has stable presence — they just
+                            // fade so the user can tell at a glance which
+                            // tags are currently unused.
+                            let is_empty = count == 0;
                             view! {
                                 <button
                                     type="button"
@@ -312,6 +328,8 @@ pub fn CampaignTracker() -> impl IntoView {
                                             // Selected: solid accent for unambiguous "this is on"
                                             // signaling, regardless of the tag's category color.
                                             format!("{} bg-accent text-accent-fg border-accent", base)
+                                        } else if is_empty {
+                                            format!("{} {} opacity-50 hover:opacity-100", base, color_classes)
                                         } else {
                                             format!("{} {} hover:brightness-125", base, color_classes)
                                         }
@@ -329,12 +347,21 @@ pub fn CampaignTracker() -> impl IntoView {
                         <Show when=move || !selected_tags.with(|s| s.is_empty())>
                             <button
                                 type="button"
-                                class="ml-2 text-xs text-fg-muted hover:text-fg underline"
+                                class="ml-1 text-xs text-fg-muted hover:text-fg underline"
                                 on:click=clear_filters
                             >
                                 "Clear filters"
                             </button>
                         </Show>
+                        // Push Reset progress to the far right of the row.
+                        <div class="flex-1 min-w-0"></div>
+                        <button
+                            class="inline-flex items-center h-8 px-3 rounded-md border border-red-700/70 bg-red-950/20 text-red-300 hover:bg-red-700/25 hover:border-red-600 hover:text-red-200 text-sm transition"
+                            on:click=open_reset
+                            title="Uncheck every checklist item across every zone"
+                        >
+                            "Reset progress"
+                        </button>
                     </div>
                 }.into_any()
             }}
@@ -427,7 +454,7 @@ pub fn CampaignTracker() -> impl IntoView {
                                                 })
                                             }}
                                             <button
-                                                class="inline-flex items-center justify-center h-7 px-2 rounded-md border border-border bg-transparent text-fg-muted hover:text-accent hover:border-accent text-xs transition"
+                                                class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-border bg-transparent text-fg-muted hover:text-accent hover:border-accent text-sm transition"
                                                 on:click={
                                                     let act = act_for_add.clone();
                                                     move |ev: web_sys::MouseEvent| {
@@ -443,7 +470,7 @@ pub fn CampaignTracker() -> impl IntoView {
                                             </button>
                                             <button
                                                 class=move || {
-                                                    let base = "inline-flex items-center gap-1 h-7 px-2 rounded-md border text-xs transition";
+                                                    let base = "inline-flex items-center gap-1 h-8 px-3 rounded-md border text-sm transition";
                                                     if is_managing_class() {
                                                         format!("{} bg-accent text-accent-fg border-accent", base)
                                                     } else {
@@ -644,25 +671,6 @@ where
     }
 }
 
-/// Pick a Tailwind color set for a tag based on a small palette of well-known
-/// PoE2 reward types — so "Skill Gem" tags read green at a glance, "Boss" red,
-/// etc. Custom/unknown tags fall back to the app's accent color.
-///
-/// Returns a string of `bg-* text-* border-*` classes ready to drop next to
-/// the layout classes on the tag pill.
-fn tag_color_classes(tag: &str) -> &'static str {
-    match tag {
-        "Skill Gem" => "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-        "Skill Point" => "bg-amber-500/15 text-amber-300 border-amber-500/30",
-        "Spirit" => "bg-violet-500/15 text-violet-300 border-violet-500/30",
-        "Boss" => "bg-red-500/15 text-red-300 border-red-500/30",
-        "Quest" => "bg-sky-500/15 text-sky-300 border-sky-500/30",
-        "Side Area" => "bg-slate-500/15 text-slate-300 border-slate-500/30",
-        "Waypoint" => "bg-orange-500/15 text-orange-300 border-orange-500/30",
-        _ => "bg-accent/15 text-accent border-accent/30",
-    }
-}
-
 #[component]
 fn ChecklistRow<F>(label: String, checked: Signal<bool>, on_toggle: F) -> impl IntoView
 where
@@ -688,5 +696,41 @@ where
                 inner_html=label_html
             ></span>
         </label>
+    }
+}
+
+// ─── UI state persistence ────────────────────────────────────────────────
+//
+// Stores small, ephemeral UI bits (which acts are open, which tag filters
+// are active) in localStorage so a reload doesn't reset them. The data
+// isn't critical, isn't worth IDB ceremony, and never gets read by any
+// other tab — localStorage is the right level.
+
+const LS_EXPANDED_ACTS: &str = "campaign_expanded_acts";
+const LS_SELECTED_TAGS: &str = "campaign_selected_tags";
+
+fn local_storage() -> Option<web_sys::Storage> {
+    web_sys::window()?.local_storage().ok().flatten()
+}
+
+fn read_string_set(key: &str) -> HashSet<String> {
+    let Some(storage) = local_storage() else {
+        return HashSet::new();
+    };
+    let Ok(Some(raw)) = storage.get_item(key) else {
+        return HashSet::new();
+    };
+    serde_json::from_str::<Vec<String>>(&raw)
+        .map(|list| list.into_iter().collect())
+        .unwrap_or_default()
+}
+
+fn write_string_set(key: &str, set: &HashSet<String>) {
+    let Some(storage) = local_storage() else {
+        return;
+    };
+    let list: Vec<&String> = set.iter().collect();
+    if let Ok(json) = serde_json::to_string(&list) {
+        let _ = storage.set_item(key, &json);
     }
 }

@@ -1,5 +1,5 @@
 use leptos::ev;
-use leptos::prelude::{window_event_listener, Set, Update};
+use leptos::prelude::{window_event_listener, GetUntracked, Set, Update};
 use leptos::web_sys;
 
 use crate::app_state::{create_blank_note, AppState, Page};
@@ -50,6 +50,7 @@ pub fn install_global_shortcuts(state: AppState) {
     // Since this is called once at root initialization, it naturally stays alive
     // for the entire life of the app without needing manual leak methods.
     window_event_listener(ev::keydown, move |ev| {
+        // Ctrl/Cmd + key (no shift, no alt) — global shortcuts.
         if (ev.ctrl_key() || ev.meta_key()) && !ev.alt_key() && !ev.shift_key() {
             let key = ev.key().to_lowercase();
             match key.as_str() {
@@ -60,10 +61,28 @@ pub fn install_global_shortcuts(state: AppState) {
                 }
                 "k" => {
                     ev.prevent_default();
-                    state.set_show_quick_switcher.update(|open| *open = !*open);
+                    toggle_quick_switcher(state, None);
+                    return;
+                }
+                "e" => {
+                    // Toggle edit mode on the current note. No-op if nothing's selected.
+                    if state.selected_note_id.get_untracked().is_some() {
+                        ev.prevent_default();
+                        state.set_edit_mode.update(|on| *on = !*on);
+                    }
                     return;
                 }
                 _ => {}
+            }
+        }
+
+        // Ctrl+Shift+K — open quick switcher scoped to the current tab.
+        if (ev.ctrl_key() || ev.meta_key()) && !ev.alt_key() && ev.shift_key() {
+            if ev.key().to_lowercase() == "k" {
+                ev.prevent_default();
+                let current = state.page.get_untracked();
+                toggle_quick_switcher(state, Some(current));
+                return;
             }
         }
 
@@ -82,6 +101,21 @@ pub fn install_global_shortcuts(state: AppState) {
             state.set_page.set(target_page);
         }
     });
+}
+
+/// Toggle the quick switcher with a given scope. If it's already open with
+/// the same scope, close it. Otherwise open it (or switch mode) with the
+/// new scope. Lets Ctrl+K and Ctrl+Shift+K behave intuitively even when
+/// the switcher is already on screen.
+fn toggle_quick_switcher(state: AppState, scope: Option<Page>) {
+    let is_open = state.show_quick_switcher.get_untracked();
+    let current_scope = state.quick_switcher_scope.get_untracked();
+    if is_open && current_scope == scope {
+        state.set_show_quick_switcher.set(false);
+    } else {
+        state.set_quick_switcher_scope.set(scope);
+        state.set_show_quick_switcher.set(true);
+    }
 }
 
 fn is_typing_target() -> bool {

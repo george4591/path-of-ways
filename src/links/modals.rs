@@ -20,7 +20,7 @@ pub struct LinkDraft {
 fn LabeledField(#[prop(into)] label: String, children: Children) -> impl IntoView {
     view! {
         <label class="flex flex-col gap-1">
-            <span class="text-xs text-fg-muted">{label}</span>
+            <span class="text-sm text-fg-muted">{label}</span>
             {children()}
         </label>
     }

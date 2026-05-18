@@ -23,7 +23,17 @@ pub fn Sidebar() -> impl IntoView {
     let set_edit_mode = app.set_edit_mode;
 
     let (search_query, set_search_query) = signal(String::new());
-    let (active_tags, set_active_tags) = signal(Vec::<String>::new());
+    // Persist tag filter selection across reloads — same rationale as
+    // Campaign's expanded acts: it's a per-user view preference, not
+    // a "data" piece worth IDB.
+    let (active_tags, set_active_tags) = signal(read_active_tags());
+    Effect::new(move |prev: Option<Vec<String>>| {
+        let current = active_tags.get();
+        if prev.is_some() {
+            write_active_tags(&current);
+        }
+        current
+    });
     let (show_new_menu, set_show_new_menu) = signal(false);
 
     let persist_note = move |note: Note| {
@@ -242,11 +252,15 @@ where
         <li class="relative group">
             <div
                 class=move || {
-                    let base = "w-full text-left px-3 py-2 rounded-md transition text-sm border cursor-pointer";
+                    // Left accent stripe + bg fill on selected (less boxy
+                    // than a full-perimeter accent border). All items
+                    // reserve the 2px left border so layout doesn't shift
+                    // between selected/unselected.
+                    let base = "w-full text-left px-3 py-2 rounded-md transition text-sm cursor-pointer border-l-2";
                     if is_selected() {
                         format!("{} bg-bg border-accent text-fg", base)
                     } else {
-                        format!("{} bg-transparent border-transparent text-fg hover:bg-bg hover:border-border", base)
+                        format!("{} bg-transparent border-transparent text-fg hover:bg-bg", base)
                     }
                 }
                 on:click=move |_| select_note(id_for_click.clone())
@@ -289,5 +303,35 @@ where
                 </button>
             </div>
         </li>
+    }
+}
+
+// ─── UI state persistence ────────────────────────────────────────────────
+//
+// The sidebar's tag filter selection is persisted to localStorage so a
+// reload keeps the user's chosen "show notes tagged X, Y" view.
+
+const LS_NOTES_ACTIVE_TAGS: &str = "notes_active_tags";
+
+fn local_storage() -> Option<web_sys::Storage> {
+    web_sys::window()?.local_storage().ok().flatten()
+}
+
+fn read_active_tags() -> Vec<String> {
+    let Some(storage) = local_storage() else {
+        return Vec::new();
+    };
+    let Ok(Some(raw)) = storage.get_item(LS_NOTES_ACTIVE_TAGS) else {
+        return Vec::new();
+    };
+    serde_json::from_str::<Vec<String>>(&raw).unwrap_or_default()
+}
+
+fn write_active_tags(tags: &[String]) {
+    let Some(storage) = local_storage() else {
+        return;
+    };
+    if let Ok(json) = serde_json::to_string(tags) {
+        let _ = storage.set_item(LS_NOTES_ACTIVE_TAGS, &json);
     }
 }

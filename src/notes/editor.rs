@@ -5,14 +5,14 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
 
 use crate::app_state::{open_note_by_title, use_app_state};
-use crate::buttons::{PrimaryButton, SecondaryButton};
+use crate::buttons::PrimaryButton;
 use crate::icons::{CheckIcon, PencilIcon};
 use crate::images::{resolve_image_urls, save_image};
 
 use super::context::use_notes_context;
 use super::highlight::highlight_within;
 use super::markdown::{render_inline_md, render_markdown};
-use super::model::{format_relative, now_ms, parse_tags, Note};
+use super::model::{format_relative, now_ms, Note};
 use super::storage::save_one;
 use super::templates::Template;
 
@@ -61,13 +61,32 @@ pub fn Editor() -> impl IntoView {
         });
     };
 
-    let on_tags_input = move |ev: web_sys::Event| {
+    // Pending tag text the user is currently typing (before it gets
+    // committed to `note.tags` on Enter or comma). Cleared on commit.
+    let (tag_input, set_tag_input) = signal(String::new());
+
+    let add_tag = move |raw: String| {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
+            return;
+        }
         let Some(id) = selected_id.get_untracked() else {
             return;
         };
-        let parsed = parse_tags(&event_target_value(&ev));
         update_note(set_notes, &id, persist_note, |note| {
-            note.tags = parsed;
+            if !note.tags.iter().any(|t| t == &trimmed) {
+                note.tags.push(trimmed);
+            }
+        });
+        set_tag_input.set(String::new());
+    };
+
+    let remove_tag = move |tag: String| {
+        let Some(id) = selected_id.get_untracked() else {
+            return;
+        };
+        update_note(set_notes, &id, persist_note, |note| {
+            note.tags.retain(|t| t != &tag);
         });
     };
 
@@ -211,20 +230,64 @@ pub fn Editor() -> impl IntoView {
                     />
                     <PrimaryButton
                         on_click=move |_| set_edit_mode.set(false)
-                        title="Done editing"
+                        title="Done editing (Ctrl+E)"
                         class="shrink-0"
                     >
                         <CheckIcon class="w-3.5 h-3.5"/>
                         "Done"
                     </PrimaryButton>
                 </div>
-                <input
-                    type="text"
-                    class="w-full rounded-md border border-border bg-bg px-3 py-1.5 text-fg text-sm placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
-                    placeholder="Tags (comma-separated)"
-                    prop:value=move || current.get().map(|note| note.tags.join(", ")).unwrap_or_default()
-                    on:input=on_tags_input
-                />
+                // Tag chips + a small input. Enter or comma commits the
+                // pending tag to `note.tags`; clicking × on a chip removes
+                // it. Mirrors the campaign zone modal's tag UX so the two
+                // pages feel consistent.
+                <div class="flex flex-wrap items-center gap-1.5">
+                    {move || current.get().map(|note| note.tags.clone()).unwrap_or_default()
+                        .into_iter().map(|tag| {
+                            let tag_for_label = tag.clone();
+                            let tag_for_click = tag.clone();
+                            view! {
+                                <span class="inline-flex items-center gap-1 rounded-full bg-bg text-fg-muted border border-border px-2 py-0.5 text-xs">
+                                    "#"{tag_for_label}
+                                    <button
+                                        type="button"
+                                        class="hover:text-fg leading-none"
+                                        on:click=move |_| remove_tag(tag_for_click.clone())
+                                        title="Remove tag"
+                                    >
+                                        "×"
+                                    </button>
+                                </span>
+                            }
+                        }).collect_view()
+                    }
+                    <input
+                        type="text"
+                        class="flex-1 min-w-[8rem] rounded-md border border-border bg-bg px-3 py-1.5 text-fg text-sm placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="Add a tag and press Enter"
+                        prop:value=move || tag_input.get()
+                        on:input=move |ev| set_tag_input.set(event_target_value(&ev))
+                        on:keydown=move |ev: web_sys::KeyboardEvent| {
+                            let key = ev.key();
+                            if key == "Enter" || key == "," {
+                                let pending = tag_input.get_untracked();
+                                if !pending.trim().is_empty() {
+                                    ev.prevent_default();
+                                    ev.stop_propagation();
+                                    add_tag(pending);
+                                }
+                            } else if key == "Backspace" && tag_input.get_untracked().is_empty() {
+                                // Backspace on empty input → pop last tag (lets the
+                                // user undo a chip without reaching for the mouse).
+                                if let Some(note) = current.get_untracked() {
+                                    if let Some(last) = note.tags.last().cloned() {
+                                        remove_tag(last);
+                                    }
+                                }
+                            }
+                        }
+                    />
+                </div>
             </Show>
             <Show when=move || !edit_mode.get() && current.get().is_some()>
                 <div class="border-b border-border pb-3 mb-1">
@@ -235,18 +298,17 @@ pub fn Editor() -> impl IntoView {
                                 &current.get().map(|note| note.display_title()).unwrap_or_default()
                             )
                         ></h2>
-                        <SecondaryButton
+                        <PrimaryButton
                             on_click=move |_| set_edit_mode.set(true)
-                            title="Edit note"
+                            title="Edit note (Ctrl+E)"
                             class="shrink-0"
                         >
                             <PencilIcon class="w-3.5 h-3.5"/>
                             "Edit"
-                        </SecondaryButton>
+                        </PrimaryButton>
                     </div>
                     <div class="flex items-center gap-2 mt-1">
                         <div class="text-xs text-fg-muted">
-                            "Updated "
                             {move || current.get().map(|note| format_relative(note.updated_at)).unwrap_or_default()}
                         </div>
                         <Show when=move || current.get().map(|note| !note.tags.is_empty()).unwrap_or(false)>
